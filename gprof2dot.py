@@ -2039,31 +2039,44 @@ class PerfParser(LineParser):
 
         line = self.consume()
         assert line
+        line = line.split(":")
+        if len(line) == 3:
+            fields, metric, tail = line
+        else:
+            head, fields, metric, tail = line
+            assert not head.strip()
+        assert fields
+        assert metric
+        assert not tail.strip()
+        n, evt_type = metric.strip().split()
+        n = int(n)
 
         callchain = self.parse_callchain()
         if not callchain:
             return
+        if evt_type != "cycles":
+            return
 
         callee = callchain[0]
-        callee[SAMPLES] += 1
-        self.profile[SAMPLES] += 1
+        callee[SAMPLES] += n
+        self.profile[SAMPLES] += n
 
         for caller in callchain[1:]:
             try:
                 call = caller.calls[callee.id]
             except KeyError:
                 call = Call(callee.id)
-                call[SAMPLES2] = 1
+                call[SAMPLES2] = n
                 caller.add_call(call)
             else:
-                call[SAMPLES2] += 1
+                call[SAMPLES2] += n
 
             callee = caller
 
         # Increment TOTAL_SAMPLES only once on each function.
         stack = set(callchain)
         for function in stack:
-            function[TOTAL_SAMPLES] += 1
+            function[TOTAL_SAMPLES] += n
 
     def parse_callchain(self):
         callchain = []
